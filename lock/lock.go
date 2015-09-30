@@ -19,9 +19,9 @@ var (
 
 // Lock allows a key in etcd to be treated as an exclusive lock. The lock is not reentrant.
 type Lock interface {
-	Acquire(timeout time.Duration) error
-	AcquireTTL(timeout, ttl time.Duration) error
-	Release(timeout time.Duration) error
+	Acquire(ctx context.Context) error
+	AcquireTTL(ctx context.Context, ttl time.Duration) error
+	Release(ctx context.Context) error
 }
 
 type lock struct {
@@ -36,21 +36,20 @@ func New(api etcd.KeysAPI, key, value string) Lock {
 }
 
 // Acquire the lock. ErrTimeout is returned after `timeout` elapses without acquiring the lock.
-func (l *lock) Acquire(timeout time.Duration) error {
-	return l.AcquireTTL(timeout, time.Duration(0))
+func (l *lock) Acquire(ctx context.Context) error {
+	return l.AcquireTTL(ctx, time.Duration(0))
 }
 
 // AcquireTTL acquires the lock as with `Acquire` but places a TTL on it. After the TTL expires the lock is released automatically.
-func (l *lock) AcquireTTL(timeout, ttl time.Duration) error {
+func (l *lock) AcquireTTL(ctx context.Context, ttl time.Duration) error {
 	var err error
 	done := make(chan error)
-	expired := time.After(timeout)
 
 Loop:
 	for {
-		ctx, cancel := context.WithCancel(context.Background())
+		acquireCtx, cancel := context.WithCancel(context.Background())
 		go func() {
-			done <- l.acquireTry(ctx, ttl)
+			done <- l.acquireTry(acquireCtx, ttl)
 		}()
 
 		select {
@@ -59,7 +58,7 @@ Loop:
 			if err != ErrExists {
 				break Loop
 			}
-		case <-expired:
+		case <-ctx.Done():
 			cancel()
 			<-done
 			if err != ErrExists {
@@ -72,9 +71,7 @@ Loop:
 }
 
 // Release the lock.
-func (l *lock) Release(timeout time.Duration) error {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(timeout))
-	defer cancel()
+func (l *lock) Release(ctx context.Context) error {
 	_, err := l.api.Delete(ctx, l.key, &etcd.DeleteOptions{PrevValue: l.value})
 	if apiErr, ok := err.(etcd.Error); ok && apiErr.Code == etcd.ErrorCodeKeyNotFound {
 		err = nil

@@ -59,7 +59,10 @@ func TestLockAcquire(t *testing.T) {
 
 	want := "node1"
 	l := lock.New(api, key, want)
-	if err := l.Acquire(500 * time.Millisecond); err == nil {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(500 * time.Millisecond))
+	defer cancel()
+
+	if err := l.Acquire(ctx); err == nil {
 		if have, err := get(); err != nil {
 			t.Error(err)
 		} else if have != want {
@@ -78,7 +81,10 @@ func TestLockAcquireExists(t *testing.T) {
 	}
 
 	l := lock.New(api, key, "node1")
-	if err := l.Acquire(500 * time.Millisecond); err == nil {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(500 * time.Millisecond))
+	defer cancel()
+
+	if err := l.Acquire(ctx); err == nil {
 		t.Error("lock acquired")
 	} else if err != lock.ErrExists {
 		t.Error(err)
@@ -90,11 +96,17 @@ func TestLockExclusive(t *testing.T) {
 	defer TearDown(t)
 
 	node1 := lock.New(api, key, "node1")
+	ctx1, cancel := context.WithDeadline(context.Background(), time.Now().Add(500 * time.Millisecond))
+	defer cancel()
+
 	node2 := lock.New(api, key, "node2")
-	if err := node1.Acquire(500 * time.Millisecond); err != nil {
+	ctx2, cancel := context.WithDeadline(context.Background(), time.Now().Add(500 * time.Millisecond))
+	defer cancel()
+
+	if err := node1.Acquire(ctx1); err != nil {
 		t.Fatal(err)
 	}
-	if err := node2.Acquire(500 * time.Millisecond); err != lock.ErrExists {
+	if err := node2.Acquire(ctx2); err != lock.ErrExists {
 		t.Error(err)
 	}
 }
@@ -104,8 +116,14 @@ func TestLockRelease(t *testing.T) {
 	defer TearDown(t)
 
 	node1 := lock.New(api, key, "node1")
+	ctx1, cancel := context.WithDeadline(context.Background(), time.Now().Add(500 * time.Millisecond))
+	defer cancel()
+
 	node2 := lock.New(api, key, "node2")
-	if err := node1.Acquire(500 * time.Millisecond); err != nil {
+	ctx2, cancel := context.WithDeadline(context.Background(), time.Now().Add(500 * time.Millisecond))
+	defer cancel()
+
+	if err := node1.Acquire(ctx1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,12 +131,12 @@ func TestLockRelease(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := node2.Acquire(500 * time.Millisecond); err != nil {
+		if err := node2.Acquire(ctx2); err != nil {
 			t.Error(err)
 		}
 	}()
 	time.Sleep(200 * time.Millisecond)
-	if err := node1.Release(500 * time.Millisecond); err != nil {
+	if err := node1.Release(context.Background()); err != nil {
 		t.Error(err)
 	}
 	wg.Wait()
@@ -130,11 +148,17 @@ func TestLockAcquireTTL(t *testing.T) {
 	defer TearDown(t)
 
 	node1 := lock.New(api, key, "node1")
+	ctx1, cancel := context.WithDeadline(context.Background(), time.Now().Add(500 * time.Millisecond))
+	defer cancel()
+
 	node2 := lock.New(api, key, "node2")
-	if err := node1.AcquireTTL(500*time.Millisecond, time.Second); err != nil {
+	ctx2, cancel := context.WithDeadline(context.Background(), time.Now().Add(2 * time.Second))
+	defer cancel()
+
+	if err := node1.AcquireTTL(ctx1, time.Second); err != nil {
 		t.Fatal(err)
 	}
-	if err := node2.Acquire(2 * time.Second); err != nil {
+	if err := node2.Acquire(ctx2); err != nil {
 		t.Error(err)
 	}
 }
