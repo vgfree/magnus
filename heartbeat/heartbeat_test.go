@@ -14,6 +14,8 @@ var (
 	key       string   = "/tests/heartbeat_value"
 	client    etcd.Client
 	api       etcd.KeysAPI
+	frequency time.Duration = 2 * time.Second
+	timeout                 = 500 * time.Millisecond
 )
 
 func get() (string, error) {
@@ -67,14 +69,12 @@ func TestTTL(t *testing.T) {
 	SetUp(t)
 	defer TearDown(t)
 
-	freq := 2 * time.Second
-	to := 500 * time.Millisecond
 	want := "testing 123"
-	if err := set(want, freq+to); err != nil {
+	if err := set(want, frequency+timeout); err != nil {
 		t.Fatal(err)
 	}
 
-	hb := heartbeat.New(api, key, freq, to)
+	hb := heartbeat.New(api, key, frequency, timeout)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -94,7 +94,7 @@ func TestTTL(t *testing.T) {
 	hb.Stop()
 	select {
 	case <-time.After(1 * time.Second):
-		t.Error("beat did not exist")
+		t.Error("beat did not exit")
 	case <-waitChan(wg):
 	}
 }
@@ -104,14 +104,12 @@ func TestNoTTL(t *testing.T) {
 	SetUp(t)
 	defer TearDown(t)
 
-	freq := 2 * time.Second
-	to := 500 * time.Millisecond
 	want := "testing 123"
 	if err := set(want, time.Duration(0)); err != nil {
 		t.Fatal(err)
 	}
 
-	hb := heartbeat.New(api, key, freq, to)
+	hb := heartbeat.New(api, key, frequency, timeout)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -131,7 +129,112 @@ func TestNoTTL(t *testing.T) {
 	hb.Stop()
 	select {
 	case <-time.After(1 * time.Second):
-		t.Error("beat did not exist")
+		t.Error("beat did not exit")
+	case <-waitChan(wg):
+	}
+}
+
+// Beat should not be callable more than once.
+func TestOneBeat(t *testing.T) {
+	SetUp(t)
+	defer TearDown(t)
+
+	want := "testing 123"
+	if err := set(want, time.Duration(0)); err != nil {
+		t.Fatal(err)
+	}
+
+	errs := make(chan error, 2)
+	hb := heartbeat.New(api, key, frequency, timeout)
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer wg.Done()
+			if err := hb.Beat(); err != nil {
+				errs <- err
+			}
+		}()
+	}
+
+	select {
+	case err := <-errs:
+		if err != heartbeat.ErrRunning {
+			t.Errorf("wrong error received: %s\n", err)
+		}
+	case <-time.After(1 * time.Second):
+		t.Error("no error received")
+	}
+
+	hb.Stop()
+	select {
+	case <-time.After(1 * time.Second):
+		t.Error("beat did not exit")
+	case <-waitChan(wg):
+	}
+}
+
+// Beat fails on missing key.
+func TestKeyNotFound(t *testing.T) {
+	SetUp(t)
+	defer TearDown(t)
+
+	errs := make(chan error, 2)
+	hb := heartbeat.New(api, key, frequency, timeout)
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := hb.Beat(); err != nil {
+			errs <- err
+		}
+	}()
+
+	select {
+	case err := <-errs:
+		if err != heartbeat.ErrNotFound {
+			t.Errorf("wrong error received: %s\n", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("no error received")
+	}
+
+	hb.Stop()
+	select {
+	case <-time.After(1 * time.Second):
+		t.Error("beat did not exit")
+	case <-waitChan(wg):
+	}
+}
+
+// Stop heartbeat when the key is deleted.
+func TestKeyDeleted(t *testing.T) {
+	SetUp(t)
+	defer TearDown(t)
+
+	want := "testing 123"
+	if err := set(want, time.Duration(0)); err != nil {
+		t.Fatal(err)
+	}
+
+	hb := heartbeat.New(api, key, frequency, timeout)
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		time.Sleep(5 * time.Second)
+		del()
+	}()
+
+	if err := hb.Beat(); err != heartbeat.ErrDeleted {
+		t.Error(err)
+	}
+
+	hb.Stop()
+	select {
+	case <-time.After(10 * time.Second):
+		t.Error("beat did not exit")
 	case <-waitChan(wg):
 	}
 }
@@ -140,8 +243,6 @@ func TestNoTTL(t *testing.T) {
 func TestStop(t *testing.T) {
 	SetUp(t)
 	defer TearDown(t)
-	freq := 2 * time.Second
-	to := 500 * time.Millisecond
-	hb := heartbeat.New(api, key, freq, to)
+	hb := heartbeat.New(api, key, frequency, timeout)
 	hb.Stop()
 }

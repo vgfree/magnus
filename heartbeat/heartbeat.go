@@ -10,6 +10,9 @@ import (
 
 var (
 	RequestTimeout time.Duration = 5 * time.Second
+	ErrRunning     error         = errors.New("heartbeat already running")
+	ErrDeleted                   = errors.New("key deleted during heartbeat")
+	ErrNotFound                  = errors.New("key not found")
 )
 
 // Heartbeat refreshes the TTL of an etcd key.
@@ -56,31 +59,30 @@ func (hb *heartbeat) get(ctx context.Context) (string, error) {
 	}
 }
 
-func (hb *heartbeat) set(ctx context.Context) error {
-	var err error
+func (hb *heartbeat) set(ctx context.Context) (err error) {
 	ttl := hb.frequency + hb.timeout
-
-	// get the value if we don't have it
-	if hb.value == "" {
-		hb.value, err = hb.get(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
 	for {
 		// atomicly set the value with the new TTL to ensure we don't overwrite a changed value
 		_, err = hb.api.Set(ctx, hb.key, hb.value, &etcd.SetOptions{PrevValue: hb.value, TTL: ttl})
-		if etcdErr, ok := err.(etcd.Error); ok && etcdErr.Code == etcd.ErrorCodeTestFailed {
+		if isEtcdErrorCode(err, etcd.ErrorCodeTestFailed) {
 			// the key has changed, get the new value and try again
 			hb.value, err = hb.get(ctx)
 			if err == nil {
 				continue
 			}
+		} else if isEtcdErrorCode(err, etcd.ErrorCodeKeyNotFound) {
+			err = ErrDeleted
 		}
 		break
 	}
 	return err
+}
+
+func isEtcdErrorCode(err error, code int) bool {
+	if err, ok := err.(etcd.Error); ok && err.Code == code {
+		return true
+	}
+	return false
 }
 
 func inClusterError(clusterError, checkError error) bool {
@@ -96,18 +98,44 @@ func inClusterError(clusterError, checkError error) bool {
 
 // Beat starts heartbeating and returns when it stops.
 func (hb *heartbeat) Beat() error {
-	ctx := func() (ctx context.Context) {
+	ctx, err := func() (ctx context.Context, err error) {
 		hb.lock.Lock()
 		defer hb.lock.Unlock()
-		ctx, hb.cancel = context.WithCancel(context.Background())
-		return ctx
+		if hb.cancel != nil {
+			err = ErrRunning
+		} else {
+			ctx, hb.cancel = context.WithCancel(context.Background())
+		}
+		return
 	}()
+	if err != nil {
+		return err
+	}
 	defer func() {
 		hb.lock.Lock()
 		defer hb.lock.Unlock()
 		hb.cancel()
+		hb.cancel = nil
 	}()
 
+	// get the value if we don't have it
+	deadline, _ := context.WithDeadline(ctx, time.Now().Add(hb.frequency))
+	hb.value, err = hb.get(deadline)
+	if isEtcdErrorCode(err, etcd.ErrorCodeKeyNotFound) {
+		return ErrNotFound
+	} else if err != nil {
+		return err
+	}
+
+	// set the ttl since the first tick is not immediate
+	err = hb.set(deadline)
+	if isEtcdErrorCode(err, etcd.ErrorCodeKeyNotFound) {
+		return ErrDeleted
+	} else if err != nil {
+		return err
+	}
+
+	// set ttl on every timer tick
 	ticker := time.NewTicker(hb.frequency)
 	for {
 		select {
@@ -115,7 +143,7 @@ func (hb *heartbeat) Beat() error {
 			deadline, _ := context.WithDeadline(ctx, tick.Add(hb.frequency))
 			err := hb.set(deadline)
 			if inClusterError(err, context.Canceled) {
-				err = nil
+				return nil
 			}
 			if err != nil {
 				return err
