@@ -119,7 +119,7 @@ func (hb *heartbeat) Beat() error {
 	}()
 
 	// get the value if we don't have it
-	deadline, _ := context.WithDeadline(ctx, time.Now().Add(hb.frequency))
+	deadline, _ := context.WithTimeout(ctx, hb.frequency)
 	hb.value, err = hb.get(deadline)
 	if isEtcdErrorCode(err, etcd.ErrorCodeKeyNotFound) {
 		return ErrNotFound
