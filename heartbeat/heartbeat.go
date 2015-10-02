@@ -152,7 +152,6 @@ func (hb *heartbeat) Beat() error {
 			return nil
 		}
 	}
-	return nil
 }
 
 // Stop the heartbeat.
