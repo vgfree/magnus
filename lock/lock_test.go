@@ -59,7 +59,7 @@ func TestLockAcquire(t *testing.T) {
 
 	want := "node1"
 	l := lock.New(api, key, want)
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(500*time.Millisecond))
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	if err := l.Acquire(ctx); err == nil {
@@ -81,7 +81,7 @@ func TestLockAcquireExists(t *testing.T) {
 	}
 
 	l := lock.New(api, key, "node1")
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(500*time.Millisecond))
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	if err := l.Acquire(ctx); err == nil {
@@ -96,11 +96,11 @@ func TestLockExclusive(t *testing.T) {
 	defer TearDown(t)
 
 	node1 := lock.New(api, key, "node1")
-	ctx1, cancel := context.WithDeadline(context.Background(), time.Now().Add(500*time.Millisecond))
+	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	node2 := lock.New(api, key, "node2")
-	ctx2, cancel := context.WithDeadline(context.Background(), time.Now().Add(500*time.Millisecond))
+	ctx2, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	if err := node1.Acquire(ctx1); err != nil {
@@ -116,11 +116,11 @@ func TestLockRelease(t *testing.T) {
 	defer TearDown(t)
 
 	node1 := lock.New(api, key, "node1")
-	ctx1, cancel := context.WithDeadline(context.Background(), time.Now().Add(500*time.Millisecond))
+	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	node2 := lock.New(api, key, "node2")
-	ctx2, cancel := context.WithDeadline(context.Background(), time.Now().Add(500*time.Millisecond))
+	ctx2, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	if err := node1.Acquire(ctx1); err != nil {
@@ -148,11 +148,11 @@ func TestLockAcquireTTL(t *testing.T) {
 	defer TearDown(t)
 
 	node1 := lock.New(api, key, "node1")
-	ctx1, cancel := context.WithDeadline(context.Background(), time.Now().Add(500*time.Millisecond))
+	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	node2 := lock.New(api, key, "node2")
-	ctx2, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+	ctx2, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	if err := node1.AcquireTTL(ctx1, time.Second); err != nil {
