@@ -33,7 +33,7 @@ type Event struct {
 	Error   error             // If there was an error, this is it.
 }
 
-// A hard Election implementation. Stores synchronizes the election in an etcd directory.
+// A hard Election implementation. Stores and synchronizes the election in an etcd directory.
 type election struct {
 	name      string              // A known value used to uniquely identify this node in the election.
 	key       string              // The etcd key (directory) that stores the election.
