@@ -72,7 +72,7 @@ func (b *election) beat() {
 	return
 }
 
-func (b *election) run(events chan *Event) {
+func (b *election) Run(events chan<- *Event) {
 	logger.Printf("%s=%s is running for leader of %s", b.name, b.value, b.key)
 	wg := &sync.WaitGroup{}
 	watchEvents := make(chan *watchEvent, 1)

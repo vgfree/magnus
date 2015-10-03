@@ -24,6 +24,9 @@ func assertEventLeaders(t *testing.T, event *election.Event, size int, leaders m
 }
 
 func TestOneElection(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	defer wg.Wait()
+
 	name := "node1"
 	value := "127.0.0.1"
 	e, err := election.New(endpoints, key, name, value, nil)
@@ -31,10 +34,16 @@ func TestOneElection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eventChan := e.Run()
+	wg.Add(2)
+	eventChan := make(chan *election.Event)
 	go func() {
+		defer wg.Done()
+		e.Run(eventChan)
+	}()
+	go func() {
+		defer wg.Done()
 		time.Sleep(5 * time.Second)
-		b.Resign()
+		e.Resign()
 	}()
 
 	events := make([]*election.Event, 0, 2)
@@ -60,6 +69,8 @@ func TestSecondElection(t *testing.T) {
 	value1 := "node1.example.com"
 	node2 := "node2"
 	value2 := "node2.example.com"
+	eventChan1 := make(chan *election.Event)
+	eventChan2 := make(chan *election.Event)
 
 	e1, err := election.New(endpoints, key, node1, value1, nil)
 	if err != nil {
@@ -73,14 +84,19 @@ func TestSecondElection(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		e1.Run(eventChan1)
+	}()
+
 	// run first election in the background
 	ready := make(chan *election.Event)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		sentReady := false
-		events := e1.Run()
-		for event := range events {
+		for event := range eventChan1 {
 			if !sentReady {
 				ready <- event
 				sentReady = true
@@ -105,9 +121,14 @@ func TestSecondElection(t *testing.T) {
 		e2.Resign()
 	}()
 
-	eventChan := e2.Run()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		e2.Run(eventChan2)
+	}()
+
 	events := make([]*election.Event, 0, 3)
-	for event := range eventChan {
+	for event := range eventChan2 {
 		t.Logf("e2 event %+v", event)
 		if event.Error == nil {
 			events = append(events, event)

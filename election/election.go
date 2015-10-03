@@ -7,16 +7,16 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 	"strings"
-	"sync"
 	"time"
 )
 
 type Election interface {
 	// Run for office! Monitors an election and attempts to vote this node as
-	// leader. Changes in election state are queued via the returend Event
+	// leader. Changes in election state are queued via the provided Event
 	// channel. If the channel blocks on receive for 100ms the event is
-	// discarded. The same channel is returned on subsequent calls.
-	Run() <-chan *Event
+	// discarded. Run may only be called once. The behavior of subsquent calls
+	// is undefined but bound to break something.
+	Run(chan<- *Event)
 
 	// Resign the node's spot as a leader. Stops any running goroutines and
 	// closed the Event channel.
@@ -43,7 +43,6 @@ type election struct {
 	api       etcd.KeysAPI        // The client to use when communicating with etcd.
 	context   context.Context     // Used to cancel all operations.
 	cancel    context.CancelFunc  // Used to cancel all operations.
-	wg        *sync.WaitGroup     // Used to wait for the Run function to complete.
 	options   *Options            // Timing options.
 }
 
@@ -88,22 +87,10 @@ func New(endpoints []string, key, name, value string, opts *Options) (Election, 
 		api:       api,
 		context:   ctx,
 		cancel:    cancel,
-		wg:        &sync.WaitGroup{},
 		options:   opts,
 	}, nil
 }
 
-func (b *election) Run() <-chan *Event {
-	b.wg.Add(1)
-	events := make(chan *Event)
-	go func() {
-		defer b.wg.Done()
-		b.run(events)
-	}()
-	return events
-}
-
 func (b *election) Resign() {
 	b.cancel()
-	b.wg.Wait()
 }
