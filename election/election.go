@@ -13,9 +13,9 @@ import (
 type Election interface {
 	// Run for office! Monitors an election and attempts to vote this node as
 	// leader. Changes in election state are queued via the provided Event
-	// channel. If the channel blocks on receive for 100ms the event is
-	// discarded. Run may only be called once. The behavior of subsquent calls
-	// is undefined but bound to break something.
+	// channel. Run will block on the channel when queuing an event in order to
+	// avoid discarding events. Run may only be called once. The behavior of
+	// subsquent calls is undefined but bound to break something.
 	Run(chan<- *Event)
 
 	// Resign the node's spot as a leader. Stops any running goroutines and

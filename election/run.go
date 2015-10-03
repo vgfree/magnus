@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	eventTimeout time.Duration = 100 * time.Millisecond
 	retryDelay                 = 5 * time.Second
 )
 
