@@ -1,4 +1,4 @@
-package ballot
+package election
 
 import (
 	"fmt"
@@ -12,19 +12,19 @@ const (
 	DefaultSize = 1
 )
 
-func (b *ballot) setSize(ctx context.Context, size int) error {
+func (b *election) setSize(ctx context.Context, size int) error {
 	opts := &etcd.SetOptions{PrevExist: etcd.PrevNoExist}
 	_, err := b.api.Set(ctx, sizeKey(b.key), fmt.Sprintf("%d", size), opts)
 	return unrollEtcdClusterError(err)
 }
 
-func (b *ballot) setLeader(ctx context.Context, value string) error {
+func (b *election) setLeader(ctx context.Context, value string) error {
 	ttl := b.options.HeartbeatFrequency + b.options.HeartbeatTimeout
 	_, err := b.api.Set(ctx, leaderKey(b.key, b.name), value, &etcd.SetOptions{TTL: ttl})
 	return unrollEtcdClusterError(err)
 }
 
-func (b *ballot) getNode(ctx context.Context) (*etcd.Node, error) {
+func (b *election) getNode(ctx context.Context) (*etcd.Node, error) {
 	opts := &etcd.GetOptions{Recursive: true, Quorum: true}
 	if res, err := b.api.Get(ctx, b.key, opts); err == nil {
 		return res.Node, nil
@@ -33,7 +33,7 @@ func (b *ballot) getNode(ctx context.Context) (*etcd.Node, error) {
 	}
 }
 
-func (b *ballot) parseState(ctx context.Context, node *etcd.Node) (size int, leaders map[string]string, err error) {
+func (b *election) parseState(ctx context.Context, node *etcd.Node) (size int, leaders map[string]string, err error) {
 	// parse size
 	size = DefaultSize
 	key := sizeKey(b.key)
@@ -67,7 +67,7 @@ func (b *ballot) parseState(ctx context.Context, node *etcd.Node) (size int, lea
 	return
 }
 
-func (b *ballot) getState(ctx context.Context) (size int, leaders map[string]string, err error) {
+func (b *election) getState(ctx context.Context) (size int, leaders map[string]string, err error) {
 	size = DefaultSize
 	leaders = map[string]string{}
 

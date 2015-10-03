@@ -1,4 +1,4 @@
-package ballot
+package election
 
 import (
 	etcd "github.com/coreos/etcd/client"

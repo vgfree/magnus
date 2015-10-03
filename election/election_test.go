@@ -1,7 +1,7 @@
-package ballot_test
+package election_test
 
 import (
-	ballot "."
+	election "."
 	"reflect"
 	"sync"
 	"testing"
@@ -10,10 +10,10 @@ import (
 
 var (
 	endpoints []string = []string{"http://127.0.0.1:2379"}
-	key       string   = "/tests/ballot"
+	key       string   = "/tests/election"
 )
 
-func assertEventLeaders(t *testing.T, event *ballot.Event, size int, leaders map[string]string) {
+func assertEventLeaders(t *testing.T, event *election.Event, size int, leaders map[string]string) {
 	if event == nil {
 		t.Error("event is nil")
 	} else if event.Size != size {
@@ -23,21 +23,21 @@ func assertEventLeaders(t *testing.T, event *ballot.Event, size int, leaders map
 	}
 }
 
-func TestOneBallot(t *testing.T) {
+func TestOneElection(t *testing.T) {
 	name := "node1"
 	value := "127.0.0.1"
-	b, err := ballot.New(endpoints, key, name, value, nil)
+	e, err := election.New(endpoints, key, name, value, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	eventChan := b.Run()
+	eventChan := e.Run()
 	go func() {
 		time.Sleep(5 * time.Second)
 		b.Resign()
 	}()
 
-	events := make([]*ballot.Event, 0, 2)
+	events := make([]*election.Event, 0, 2)
 	for event := range eventChan {
 		t.Logf("event %+v", event)
 		if event.Error == nil {
@@ -55,17 +55,17 @@ func TestOneBallot(t *testing.T) {
 	}
 }
 
-func TestSecondBallot(t *testing.T) {
+func TestSecondElection(t *testing.T) {
 	node1 := "node1"
 	value1 := "node1.example.com"
 	node2 := "node2"
 	value2 := "node2.example.com"
 
-	b1, err := ballot.New(endpoints, key, node1, value1, nil)
+	e1, err := election.New(endpoints, key, node1, value1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b2, err := ballot.New(endpoints, key, node2, value2, nil)
+	e2, err := election.New(endpoints, key, node2, value2, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,19 +73,19 @@ func TestSecondBallot(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
-	// run first ballot in the background
-	ready := make(chan *ballot.Event)
+	// run first election in the background
+	ready := make(chan *election.Event)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		sentReady := false
-		events := b1.Run()
+		events := e1.Run()
 		for event := range events {
 			if !sentReady {
 				ready <- event
 				sentReady = true
 			}
-			t.Logf("b1 event %+v", event)
+			t.Logf("e1 event %+v", event)
 		}
 	}()
 
@@ -98,17 +98,17 @@ func TestSecondBallot(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(5 * time.Second)
-		t.Log("b1 resigning")
-		b1.Resign()
+		t.Log("e1 resigning")
+		e1.Resign()
 		time.Sleep(5 * time.Second)
-		t.Log("b2 resigning")
-		b2.Resign()
+		t.Log("e2 resigning")
+		e2.Resign()
 	}()
 
-	eventChan := b2.Run()
-	events := make([]*ballot.Event, 0, 3)
+	eventChan := e2.Run()
+	events := make([]*election.Event, 0, 3)
 	for event := range eventChan {
-		t.Logf("b2 event %+v", event)
+		t.Logf("e2 event %+v", event)
 		if event.Error == nil {
 			events = append(events, event)
 		} else {

@@ -1,4 +1,4 @@
-package ballot
+package election
 
 import (
 	"time"

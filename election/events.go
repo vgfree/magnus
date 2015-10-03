@@ -1,10 +1,10 @@
-package ballot
+package election
 
 import (
 	"time"
 )
 
-func (b *ballot) emitError(events chan<- *Event, err error) bool {
+func (b *election) emitError(events chan<- *Event, err error) bool {
 	event := &Event{
 		Time:  time.Now().UTC(),
 		Name:  b.name,
@@ -18,7 +18,7 @@ func (b *ballot) emitError(events chan<- *Event, err error) bool {
 	return false
 }
 
-func (b *ballot) emitEvent(events chan<- *Event, size int, leaders map[string]string) bool {
+func (b *election) emitEvent(events chan<- *Event, size int, leaders map[string]string) bool {
 	event := &Event{
 		Time:    time.Now().UTC(),
 		Name:    b.name,

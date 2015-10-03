@@ -1,4 +1,4 @@
-package ballot
+package election
 
 import (
 	etcd "github.com/coreos/etcd/client"
@@ -6,7 +6,7 @@ import (
 )
 
 // attempt to vote the node in as a leader
-func (b *ballot) vote() (size int, leaders map[string]string, err error) {
+func (b *election) vote() (size int, leaders map[string]string, err error) {
 	// give the vote operation a time limit
 	debug.Printf("%s voting in %s", b.name, b.key)
 	ctx, cancel := context.WithTimeout(b.context, b.options.ElectionTimeout)
@@ -53,7 +53,7 @@ func (b *ballot) vote() (size int, leaders map[string]string, err error) {
 }
 
 // remove the node as leader
-func (b *ballot) resign() (size int, leaders map[string]string, err error) {
+func (b *election) resign() (size int, leaders map[string]string, err error) {
 	debug.Printf("resigning %s as leader of %s", b.name, b.key)
 	ctx, cancel := context.WithTimeout(context.Background(), b.options.ElectionTimeout)
 	defer cancel()

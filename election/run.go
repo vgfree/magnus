@@ -1,4 +1,4 @@
-package ballot
+package election
 
 import (
 	"github.com/WiFast/go-ballot/heartbeat"
@@ -19,8 +19,8 @@ type watchEvent struct {
 	Error error
 }
 
-// watch queues ballot changes into `events`.
-func (b *ballot) watch(events chan<- *watchEvent) {
+// watch queues election changes into `events`.
+func (b *election) watch(events chan<- *watchEvent) {
 	debug.Printf("watch on %s started", b.key)
 	watcher := b.api.Watcher(b.key, &etcd.WatcherOptions{Recursive: true})
 	for {
@@ -51,7 +51,7 @@ func (b *ballot) watch(events chan<- *watchEvent) {
 
 // beat heartbeat the node's leader key. It exits when stopped or when the key
 // key is deleted.
-func (b *ballot) beat() {
+func (b *election) beat() {
 	for {
 		err := b.heartbeat.Beat()
 		if err == nil {
@@ -72,7 +72,7 @@ func (b *ballot) beat() {
 	return
 }
 
-func (b *ballot) run(events chan *Event) {
+func (b *election) run(events chan *Event) {
 	logger.Printf("%s=%s is running for leader of %s", b.name, b.value, b.key)
 	wg := &sync.WaitGroup{}
 	watchEvents := make(chan *watchEvent, 1)
@@ -107,7 +107,7 @@ func (b *ballot) run(events chan *Event) {
 			}
 		} else if err == context.Canceled {
 			// exit loop on cancelation
-			logger.Print("ballot canceled, returning")
+			logger.Print("election canceled, returning")
 		} else {
 			// queue errors downstream
 			logger.Printf("election error, retrying: %s", err)
