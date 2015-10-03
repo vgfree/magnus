@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	retryDelay                 = 5 * time.Second
+	retryDelay = 5 * time.Second
 )
 
 type watchEvent struct {
