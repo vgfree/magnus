@@ -49,11 +49,7 @@ func TestOneElection(t *testing.T) {
 	events := make([]*election.Event, 0, 2)
 	for event := range eventChan {
 		t.Logf("event %+v", event)
-		if event.Error == nil {
-			events = append(events, event)
-		} else {
-			t.Fatal(event.Error)
-		}
+		events = append(events, event)
 	}
 
 	if len(events) != 2 {
@@ -130,11 +126,7 @@ func TestSecondElection(t *testing.T) {
 	events := make([]*election.Event, 0, 3)
 	for event := range eventChan2 {
 		t.Logf("e2 event %+v", event)
-		if event.Error == nil {
-			events = append(events, event)
-		} else {
-			t.Fatal(event.Error)
-		}
+		events = append(events, event)
 	}
 
 	if len(events) != 3 {

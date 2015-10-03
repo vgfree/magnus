@@ -30,7 +30,6 @@ type Event struct {
 	Name    string            // The name of this node.
 	Size    int               // How many leaders are allowed.
 	Leaders map[string]string // The leaders at the time of this event.
-	Error   error             // If there was an error, this is it.
 }
 
 // A hard Election implementation. Stores and synchronizes the election in an etcd directory.

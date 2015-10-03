@@ -9,17 +9,19 @@ import (
 	"time"
 )
 
-var (
-	retryDelay = 5 * time.Second
-)
-
-type watchEvent struct {
-	Key   string
-	Error error
+// emit an election event.
+func (b *election) emit(events chan<- *Event, size int, leaders map[string]string) {
+	event := &Event{
+		Time:    time.Now().UTC(),
+		Name:    b.name,
+		Size:    size,
+		Leaders: leaders,
+	}
+	events <- event
 }
 
 // watch queues election changes into `events`.
-func (b *election) watch(events chan<- *watchEvent) {
+func (b *election) watch(events chan<- string) {
 	debug.Printf("watch on %s started", b.key)
 	watcher := b.api.Watcher(b.key, &etcd.WatcherOptions{Recursive: true})
 	for {
@@ -36,13 +38,12 @@ func (b *election) watch(events chan<- *watchEvent) {
 		if err == nil {
 			if hasEtcdPrefix(res.Node.Key, sizeKey(b.key)) || hasEtcdPrefix(res.Node.Key, leadersKey(b.key)) {
 				debug.Printf("watcher emitting event %s}", res.Node.Key)
-				events <- &watchEvent{Key: res.Node.Key}
+				events <- res.Node.Key
 			} else {
 				debug.Printf("watcher discarding event %s}", res.Node.Key)
 			}
 		} else {
-			debug.Printf("watcher emits error on %s: %s", res.Node.Key, err)
-			events <- &watchEvent{Error: err}
+			logger.Printf("watch error on %s: %s", res.Node.Key, err)
 		}
 	}
 	close(events)
@@ -74,7 +75,7 @@ func (b *election) beat() {
 func (b *election) Run(events chan<- *Event) {
 	logger.Printf("%s=%s is running for leader of %s", b.name, b.value, b.key)
 	wg := &sync.WaitGroup{}
-	watchEvents := make(chan *watchEvent, 1)
+	watchEvents := make(chan string, 1)
 	size := 0
 	leaders := map[string]string{}
 
@@ -100,7 +101,7 @@ func (b *election) Run(events chan<- *Event) {
 			}
 			if newSize != size || !reflect.DeepEqual(newLeaders, leaders) {
 				logger.Printf("leadership changed size=%d leaders=%+v", newSize, newLeaders)
-				b.emitEvent(events, newSize, newLeaders)
+				b.emit(events, newSize, newLeaders)
 				size = newSize
 				leaders = newLeaders
 			}
@@ -110,7 +111,6 @@ func (b *election) Run(events chan<- *Event) {
 		} else {
 			// queue errors downstream
 			logger.Printf("election error, retrying: %s", err)
-			b.emitError(events, err)
 		}
 		return err
 	}
@@ -121,10 +121,9 @@ func (b *election) Run(events chan<- *Event) {
 		newSize, newLeaders, err := b.resign()
 		if err != nil {
 			logger.Printf("resign failed: %s", b.name)
-			b.emitError(events, err)
 		} else if newSize != size || !reflect.DeepEqual(newLeaders, leaders) {
 			logger.Printf("%s resigned leadership of %s", b.name, b.key)
-			b.emitEvent(events, newSize, newLeaders)
+			b.emit(events, newSize, newLeaders)
 		}
 	}()
 
@@ -144,17 +143,13 @@ func (b *election) Run(events chan<- *Event) {
 	tick := time.NewTicker(60 * time.Second)
 	for {
 		select {
-		case watchEvent, ok := <-watchEvents:
+		case _, ok := <-watchEvents:
 			if !ok {
 				// exit loop on channel close
 				debug.Print("watch event channel closed, returning")
 				return
-			} else if watchEvent.Error == nil {
-				if doVote() == context.Canceled {
-					return
-				}
-			} else {
-				b.emitError(events, watchEvent.Error)
+			} else if doVote() == context.Canceled {
+				return
 			}
 		case <-tick.C:
 			if doVote() == context.Canceled {
