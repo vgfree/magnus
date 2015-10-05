@@ -34,11 +34,10 @@ $(GOBIN)/ballotd.static: $(project_path)
 	mv $(GOPATH)/bin/ballotd $(GOBIN)/ballotd.static
 
 test: $(project_path)
-	test -z "$(shell gofmt -s -l ./election ./heartbeat ./lock)"
-	go vet ./cmd/ballotd ./election ./heartbeat ./lock
-	go get -d -t ./cmd/ballotd ./election ./heartbeat ./lock
-	go test -v -race ./cmd/ballotd ./election ./heartbeat ./lock
-	#go test -v ./election
+	test -z "$(shell gofmt -s -l ./aws ./cmd/ballotd ./election ./heartbeat ./lock)"
+	go vet ./aws ./cmd/ballotd ./election ./heartbeat ./lock
+	go get -d -t ./aws ./cmd/ballotd ./election ./heartbeat ./lock
+	go test -v -race ./aws ./cmd/ballotd ./election ./heartbeat ./lock
 
 container:
 	docker build -t $(container_name):latest .
