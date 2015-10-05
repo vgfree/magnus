@@ -19,15 +19,13 @@ func main() {
 	var (
 		endpoints StringsOpt
 		key string
-		name string
 		privateIPs StringsOpt
 		options *election.Options = &election.Options{}
 	)
 
 	flags := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flags.Var(&endpoints, "endpoints", "A list of etcd endpoints to connect to.")
-	flags.StringVar(&key, "key", "", "Path to the etcd key where the election is stored.")
-	flags.StringVar(&name, "name", "", "The unique name of the node. Used to identify the node in the election.")
+	flags.StringVar(&key, "key", "", "Path to the etcd directory where the election is stored.")
 	flags.Var(&privateIPs, "private-ips", "A list of private IP addresses to choose from.")
 	flags.DurationVar(&options.ElectionTimeout, "election-timeout", election.DefaultElectionTimeout, "How long to wait for etcd to respond during an election.")
 	flags.DurationVar(&options.HeartbeatFrequency, "heartbeat-frequency", election.DefaultHeartbeatFrequency, "How frequently to refresh the leader key in etcd.")
@@ -36,9 +34,6 @@ func main() {
 
 	if key == "" {
 		logger.Fatal("key is required")
-	}
-	if name == "" {
-		logger.Fatal("name is required")
 	}
 	if len(privateIPs) == 0 {
 		logger.Fatal("at least one private ip must be provided")
@@ -52,7 +47,7 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	el, err := election.New([]string(endpoints), key, name, nominator, options)
+	el, err := election.New([]string(endpoints), key, nominator.InstanceID(), nominator, options)
 	if err != nil {
 		logger.Fatal(err)
 	}

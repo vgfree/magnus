@@ -71,3 +71,13 @@ func (pip *PrivateIP) Nominate(ctx context.Context, name string, size int, leade
 func (pip *PrivateIP) LeaderEvent(ctx context.Context, size int, leaders map[string]string) error {
 	return nil
 }
+
+// Return the instance ID.
+func (pip *PrivateIP) InstanceID() string {
+	return pip.instanceID
+}
+
+// Return the network interface ID.
+func (pip *PrivateIP) InterfaceID() string {
+	return pip.interfaceID
+}
