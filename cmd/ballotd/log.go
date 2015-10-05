@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/WiFast/go-ballot/aws"
 	"github.com/WiFast/go-ballot/election"
 	"io/ioutil"
 	"log"
@@ -25,6 +26,7 @@ func SetLogger(l *log.Logger, dbg bool) {
 	} else {
 		debug = log.New(ioutil.Discard, "", log.LstdFlags)
 	}
+	aws.SetLogger(l, dbg)
 	election.SetLogger(l, dbg)
 }
 
