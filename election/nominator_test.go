@@ -13,12 +13,21 @@ type Nominator struct {
 	t            *testing.T
 }
 
+func CopyStringMap(m map[string]string) map[string]string {
+	cp := make(map[string]string, len(m))
+	for key, value := range m {
+		cp[key] = value
+	}
+	return cp
+}
+
 func (n *Nominator) Nominate(ctx context.Context, name string, size int, leaders map[string]string) (string, error) {
-	n.t.Logf("%s nominate name=%s size=%d leaders=%+v", n.Name, name, size, leaders)
+	leadersCopy := CopyStringMap(leaders)
+	n.t.Logf("%s nominate name=%s size=%d leaders=%+v", n.Name, name, size, leadersCopy)
 	nom := &Nomination{
 		Name:    name,
 		Size:    size,
-		Leaders: leaders,
+		Leaders: leadersCopy,
 		Result:  make(chan interface{}),
 	}
 	n.Nominations <- nom
@@ -39,10 +48,11 @@ func (n *Nominator) Nominate(ctx context.Context, name string, size int, leaders
 }
 
 func (n *Nominator) LeaderEvent(ctx context.Context, size int, leaders map[string]string) error {
-	n.t.Logf("%s event size=%d leaders=%+v", n.Name, size, leaders)
+	leadersCopy := CopyStringMap(leaders)
+	n.t.Logf("%s event size=%d leaders=%+v", n.Name, size, leadersCopy)
 	n.LeaderEvents <- &LeaderEvent{
 		Size:    size,
-		Leaders: leaders,
+		Leaders: leadersCopy,
 	}
 	return nil
 }
