@@ -9,17 +9,6 @@ import (
 	"time"
 )
 
-// emit an election event.
-func (b *election) emit(events chan<- *Event, size int, leaders map[string]string) {
-	event := &Event{
-		Time:    time.Now().UTC(),
-		Name:    b.name,
-		Size:    size,
-		Leaders: leaders,
-	}
-	events <- event
-}
-
 // watch queues election changes into `events`.
 func (b *election) watch(events chan<- string) {
 	debug.Printf("watch on %s started", b.key)
@@ -72,15 +61,14 @@ func (b *election) beat() {
 	return
 }
 
-func (b *election) Run(events chan<- *Event) {
-	logger.Printf("%s=%s is running for leader of %s", b.name, b.value, b.key)
+func (b *election) Run() {
+	logger.Printf("%s is running for leader of %s", b.name, b.key)
 	wg := &sync.WaitGroup{}
 	watchEvents := make(chan string, 1)
 	size := 0
 	leaders := map[string]string{}
 
 	defer func() {
-		close(events)
 		wg.Wait()
 	}()
 
@@ -101,13 +89,19 @@ func (b *election) Run(events chan<- *Event) {
 			}
 			if newSize != size || !reflect.DeepEqual(newLeaders, leaders) {
 				logger.Printf("leadership changed size=%d leaders=%+v", newSize, newLeaders)
-				b.emit(events, newSize, newLeaders)
+				if nomErr := b.nominator.LeaderEvent(b.context, newSize, newLeaders); nomErr == context.Canceled {
+					debug.Print("canceled sending leadership change event")
+					return nil
+				} else if nomErr != nil {
+					logger.Printf("leadership change event failed: %s", nomErr)
+				}
 				size = newSize
 				leaders = newLeaders
 			}
 		} else if err == context.Canceled {
 			// exit loop on cancelation
 			logger.Print("election canceled, returning")
+			err = nil
 		} else {
 			// queue errors downstream
 			logger.Printf("election error, retrying: %s", err)
@@ -123,7 +117,10 @@ func (b *election) Run(events chan<- *Event) {
 			logger.Printf("resign failed: %s", b.name)
 		} else if newSize != size || !reflect.DeepEqual(newLeaders, leaders) {
 			logger.Printf("%s resigned leadership of %s", b.name, b.key)
-			b.emit(events, newSize, newLeaders)
+			b.nominator.LeaderEvent(b.context, newSize, newLeaders)
+			if nomErr := b.nominator.LeaderEvent(b.context, newSize, newLeaders); nomErr != nil && nomErr != context.Canceled {
+				logger.Printf("leadership change event failed: %s", nomErr)
+			}
 		}
 	}()
 

@@ -24,6 +24,14 @@ func (b *election) setLeader(ctx context.Context, value string) error {
 	return unrollEtcdClusterError(err)
 }
 
+func (b *election) delLeader(ctx context.Context) error {
+	_, err := b.api.Delete(ctx, leaderKey(b.key, b.name), nil)
+	if isEtcdErrorCode(err, etcd.ErrorCodeKeyNotFound) {
+		err = nil
+	}
+	return unrollEtcdClusterError(err)
+}
+
 func (b *election) getNode(ctx context.Context) (*etcd.Node, error) {
 	opts := &etcd.GetOptions{Recursive: true, Quorum: true}
 	if res, err := b.api.Get(ctx, b.key, opts); err == nil {

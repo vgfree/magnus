@@ -1,7 +1,6 @@
 package election
 
 import (
-	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
@@ -30,25 +29,29 @@ func (b *election) vote() (size int, leaders map[string]string, err error) {
 		return
 	}
 
-	// set us up the leader
-	value, exists := leaders[b.name]
-	if (exists && value != b.value) || (!exists && len(leaders) < size) {
-		err = b.setLeader(ctx, b.value)
-		if err == nil {
-			if exists {
-				debug.Printf("%s already leader of %s", b.name, b.key)
-			}
-			debug.Printf("elected %s leader of %s", b.name, b.key)
-			leaders[b.name] = b.value
-		} else {
-			err = unrollEtcdClusterError(err)
-			debug.Printf("vote failed, could not set leader: %s", err)
-		}
-	} else if exists {
+	// check if we're already a leader
+	if _, exists := leaders[b.name]; exists {
 		debug.Printf("%s already leader of %s", b.name, b.key)
-	} else {
-		debug.Printf("lost election, already %d leaders in %s", size, b.key)
+		return
+	} else if len(leaders) >= size {
+		debug.Printf("klready %d leaders in %s", size, b.key)
+		return
 	}
+
+	// nominate the node
+	value := ""
+	value, err = b.nominator.Nominate(ctx, b.name, size, leaders)
+	if err != nil {
+		logger.Printf("vote failed, nominator returned error: %s", err)
+		return
+	}
+
+	// set us up the leader
+	if err = b.setLeader(ctx, value); err != nil {
+		logger.Printf("vote failed, could not set leader: %s", err)
+		return
+	}
+	leaders[b.name] = value
 	return
 }
 
@@ -75,19 +78,17 @@ func (b *election) resign() (size int, leaders map[string]string, err error) {
 	}
 
 	// delete the leader key
-	if _, ok := leaders[b.name]; ok {
-		_, err := b.api.Delete(ctx, leaderKey(b.key, b.name), nil)
-		if isEtcdErrorCode(err, etcd.ErrorCodeKeyNotFound) {
-			err = nil
-			debug.Printf("resign complete, %s was not a leader of %s", b.name, b.key)
-		} else {
-			debug.Printf("resign complete, %s stepped down as leader of %s", b.name, b.key)
-		}
-		if err == nil {
-			delete(leaders, b.name)
-		}
-	} else {
+	if _, exists := leaders[b.name]; !exists {
 		debug.Printf("resign complete, %s was not a leader of %s", b.name, b.key)
+		return
+	}
+
+	err = b.delLeader(ctx)
+	if err == nil {
+		debug.Printf("resign complete, %s stepped down as leader of %s", b.name, b.key)
+		delete(leaders, b.name)
+	} else {
+		debug.Printf("resign failed: %s", err)
 	}
 	return
 }

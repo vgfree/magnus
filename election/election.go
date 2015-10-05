@@ -12,11 +12,12 @@ import (
 
 type Election interface {
 	// Run for office! Monitors an election and attempts to vote this node as
-	// leader. Changes in election state are queued via the provided Event
-	// channel. Run will block on the channel when queuing an event in order to
-	// avoid discarding events. Run may only be called once. The behavior of
-	// subsquent calls is undefined but bound to break something.
-	Run(chan<- *Event)
+	// leader. Call's the Nominators Nominate method when a the node attempts
+	// to gain a leadership position. Changes in election state are queued via
+	// the Nominator's LeaderEvent method. Should only be called once per
+	// Election. The behavior of subsquent calls to Run is undefined but bound
+	// to break something.
+	Run()
 
 	// Resign the node's spot as a leader. Stops any running goroutines and
 	// closed the Event channel.
@@ -36,9 +37,9 @@ type Event struct {
 type election struct {
 	name      string              // A known value used to uniquely identify this node in the election.
 	key       string              // The etcd key (directory) that stores the election.
-	value     string              // A value to set in the leader key.
 	lock      lock.Lock           // Used to sychronize access to the etcd directory.
 	heartbeat heartbeat.Heartbeat // Used to refresh the TTL on this node's key while the node is a leader.
+	nominator Nominator           // The nominator in charge of nominating and configuring nodes.
 	api       etcd.KeysAPI        // The client to use when communicating with etcd.
 	context   context.Context     // Used to cancel all operations.
 	cancel    context.CancelFunc  // Used to cancel all operations.
@@ -46,7 +47,7 @@ type election struct {
 }
 
 // New creates a new Election.
-func New(endpoints []string, key, name, value string, opts *Options) (Election, error) {
+func New(endpoints []string, key, name string, nominator Nominator, opts *Options) (Election, error) {
 	if strings.ContainsAny(name, "/") {
 		return nil, errors.New("name may not contain a forward slash")
 	}
@@ -80,9 +81,9 @@ func New(endpoints []string, key, name, value string, opts *Options) (Election, 
 	return &election{
 		name:      name,
 		key:       key,
-		value:     value,
 		lock:      lock.New(api, lockKey(key), name),
 		heartbeat: heartbeat.New(api, leaderKey(key, name), opts.HeartbeatFrequency, opts.HeartbeatTimeout),
+		nominator: nominator,
 		api:       api,
 		context:   ctx,
 		cancel:    cancel,
