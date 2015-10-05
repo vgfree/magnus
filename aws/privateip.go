@@ -1,4 +1,4 @@
-package privateip
+package aws
 
 import (
 	"errors"
@@ -16,14 +16,10 @@ type PrivateIP struct {
 	privateIPs  []string
 }
 
-// New creates a new PrivateIP 
-func New(privateIPs []string) (*PrivateIP, error) {
+// NewPrivateIP creates a new PrivateIP nominator.
+func NewPrivateIP(instanceID string, privateIPs []string) (*PrivateIP, error) {
 	if len(privateIPs) == 0 {
 		return nil, errors.New("no private IPs provided")
-	}
-	instanceID, err := EC2InstanceID()
-	if err != nil {
-		return nil, err
 	}
 	interfaceID, err := EC2InterfaceID()
 	if err != nil {
@@ -68,16 +64,6 @@ func (pip *PrivateIP) Nominate(ctx context.Context, name string, size int, leade
 }
 
 // LeaderEvent processes a leader change event. We just discard them.
-func (pip *PrivateIP) LeaderEvent(ctx context.Context, size int, leaders map[string]string) error {
+func (*PrivateIP) LeaderEvent(ctx context.Context, size int, leaders map[string]string) error {
 	return nil
-}
-
-// Return the instance ID.
-func (pip *PrivateIP) InstanceID() string {
-	return pip.instanceID
-}
-
-// Return the network interface ID.
-func (pip *PrivateIP) InterfaceID() string {
-	return pip.interfaceID
 }

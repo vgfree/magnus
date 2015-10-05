@@ -1,4 +1,4 @@
-package privateip
+package aws
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ import (
 )
 
 var (
-	httpClient *http.Client
-	connectTimeout time.Duration = 5 * time.Second
+	httpClient      *http.Client
+	connectTimeout  time.Duration = 5 * time.Second
 	responseTimeout time.Duration = 15 * time.Second
-	metadataURL = "http://169.254.169.254/latest/meta-data/"
+	metadataURL                   = "http://169.254.169.254/latest/meta-data/"
 )
 
 func init() {

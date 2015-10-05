@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
+	"github.com/WiFast/go-ballot/aws"
 	"github.com/WiFast/go-ballot/election"
-	"github.com/WiFast/go-ballot/privateip"
 	"os"
 	"os/signal"
 	"strings"
@@ -17,10 +17,10 @@ var (
 
 func main() {
 	var (
-		endpoints StringsOpt
-		key string
+		endpoints  StringsOpt
+		key        string
 		privateIPs StringsOpt
-		options *election.Options = &election.Options{}
+		options    *election.Options = &election.Options{}
 	)
 
 	flags := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -42,12 +42,16 @@ func main() {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, os.Interrupt)
 
-	nominator, err := privateip.New([]string(privateIPs))
+	instanceID, err := aws.EC2InstanceID()
+	if err != nil {
+		logger.Fatalf("unable to get instance ID: %s", err)
+	}
+	nominator, err := aws.NewPrivateIP(instanceID, []string(privateIPs))
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	el, err := election.New([]string(endpoints), key, nominator.InstanceID(), nominator, options)
+	el, err := election.New([]string(endpoints), key, instanceID, nominator, options)
 	if err != nil {
 		logger.Fatal(err)
 	}
