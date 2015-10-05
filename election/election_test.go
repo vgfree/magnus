@@ -2,6 +2,7 @@ package election_test
 
 import (
 	election "."
+	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 	"reflect"
 	"sync"
@@ -13,6 +14,24 @@ var (
 	endpoints []string = []string{"http://127.0.0.1:2379"}
 	key       string   = "/tests/election"
 )
+
+func TearDown(t *testing.T) {
+	client, err := etcd.New(etcd.Config{
+		Endpoints: endpoints,
+		Transport: etcd.DefaultTransport,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	api := etcd.NewKeysAPI(client)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err = api.Delete(ctx, key, &etcd.DeleteOptions{Recursive: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func WaitChan(wg *sync.WaitGroup) <-chan struct{} {
 	ch := make(chan struct{})
@@ -26,7 +45,7 @@ func WaitChan(wg *sync.WaitGroup) <-chan struct{} {
 func AssertWait(t *testing.T, ctx context.Context, wg *sync.WaitGroup) {
 	select {
 	case <-ctx.Done():
-		t.Error("timed out waiting for WaitGroup")
+		t.Fatal("timed out waiting for WaitGroup")
 	case <-WaitChan(wg):
 	}
 }
@@ -59,18 +78,20 @@ func AssertEvent(t *testing.T, event *LeaderEvent, size int, leaders map[string]
 	}
 }
 
-func AggNoms(nominator *Nominator, value string) []*Nomination {
+func AggNoms(t *testing.T, nominator *Nominator, value string) []*Nomination {
 	nominations := []*Nomination{}
 	for nomination := range nominator.Nominations {
 		nomination.Result <- value
+		t.Logf("agg nom %+v", nomination)
 		nominations = append(nominations, nomination)
 	}
 	return nominations
 }
 
-func AggEvents(nominator *Nominator) []*LeaderEvent {
+func AggEvents(t *testing.T, nominator *Nominator) []*LeaderEvent {
 	events := []*LeaderEvent{}
 	for event := range nominator.LeaderEvents {
+		t.Logf("agg event %+v", event)
 		events = append(events, event)
 	}
 	return events
@@ -84,7 +105,7 @@ func AssertNoms(t *testing.T, have []*Nomination, want []*Nomination) {
 	for n, w := range want {
 		h := have[n]
 		if h.Name != w.Name || h.Size != w.Size || !reflect.DeepEqual(h.Leaders, w.Leaders) {
-			t.Errorf("nomination %d incorret: %+v != %+v", n, h, w)
+			t.Errorf("nomination %d incorrect: %+v != %+v", n, h, w)
 		}
 	}
 }
@@ -97,39 +118,39 @@ func AssertEvents(t *testing.T, have []*LeaderEvent, want []*LeaderEvent) {
 	for n, w := range want {
 		h := have[n]
 		if !reflect.DeepEqual(h, w) {
-			t.Errorf("event %d incorret: %+v != %+v", n, h, w)
+			t.Errorf("event %d incorrect: %+v != %+v", n, h, w)
 		}
 	}
 }
 
 func RunElection(t *testing.T, ctx context.Context, name, value string) ([]*Nomination, []*LeaderEvent) {
 	nominator := &Nominator{
+		Name:         name,
 		Nominations:  make(chan *Nomination),
 		LeaderEvents: make(chan *LeaderEvent),
+		t:            t,
 	}
 
-	aggwg := &sync.WaitGroup{}
-	aggwg.Add(2)
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
 
 	nominations := []*Nomination{}
 	go func() {
-		defer aggwg.Done()
-		nominations = AggNoms(nominator, value)
+		defer wg.Done()
+		nominations = AggNoms(t, nominator, value)
 	}()
 
 	events := []*LeaderEvent{}
 	go func() {
-		defer aggwg.Done()
-		events = AggEvents(nominator)
+		defer wg.Done()
+		events = AggEvents(t, nominator)
 	}()
 
 	el := NewElection(t, name, nominator)
-
-	elwg := &sync.WaitGroup{}
-	elwg.Add(1)
 	go func() {
-		defer elwg.Done()
+		defer wg.Done()
 		el.Run()
+		nominator.Close()
 	}()
 
 	<-ctx.Done()
@@ -137,20 +158,19 @@ func RunElection(t *testing.T, ctx context.Context, name, value string) ([]*Nomi
 	el.Resign()
 	waitctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	AssertWait(t, waitctx, elwg)
-	nominator.Close()
-	AssertWait(t, waitctx, aggwg)
+	AssertWait(t, waitctx, wg)
 	return nominations, events
 }
 
 func TestOneElection(t *testing.T) {
+	defer TearDown(t)
 	name := "node1"
 	value := "127.0.0.1"
 
 	nominations := []*Nomination{}
 	events := []*LeaderEvent{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	nominations, events = RunElection(t, ctx, name, value)
 
@@ -165,6 +185,7 @@ func TestOneElection(t *testing.T) {
 }
 
 func TestSecondElection(t *testing.T) {
+	defer TearDown(t)
 	name1 := "node1"
 	value1 := "10.1.1.10"
 	noms1 := []*Nomination{}
@@ -178,24 +199,24 @@ func TestSecondElection(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
-	// run first election immediately; resign at 4s
+	// run first election immediately; resign at 10s
 	go func() {
 		defer wg.Done()
-		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		noms1, events1 = RunElection(t, ctx, name1, value1)
 	}()
 
-	// run second election at 2s; resign at 6s
+	// run second election at 5s; resign at 15s
 	go func() {
 		defer wg.Done()
-		time.Sleep(3 * time.Second)
-		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		time.Sleep(5 * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		noms2, events2 = RunElection(t, ctx, name2, value2)
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	AssertWait(t, ctx, wg)
 

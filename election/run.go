@@ -117,7 +117,6 @@ func (b *election) Run() {
 			logger.Printf("resign failed: %s", b.name)
 		} else if newSize != size || !reflect.DeepEqual(newLeaders, leaders) {
 			logger.Printf("%s resigned leadership of %s", b.name, b.key)
-			b.nominator.LeaderEvent(b.context, newSize, newLeaders)
 			if nomErr := b.nominator.LeaderEvent(b.context, newSize, newLeaders); nomErr != nil && nomErr != context.Canceled {
 				logger.Printf("leadership change event failed: %s", nomErr)
 			}

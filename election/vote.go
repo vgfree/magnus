@@ -34,7 +34,7 @@ func (b *election) vote() (size int, leaders map[string]string, err error) {
 		debug.Printf("%s already leader of %s", b.name, b.key)
 		return
 	} else if len(leaders) >= size {
-		debug.Printf("klready %d leaders in %s", size, b.key)
+		debug.Printf("already %d leaders in %s", size, b.key)
 		return
 	}
 

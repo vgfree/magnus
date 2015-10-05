@@ -3,33 +3,25 @@ package election_test
 import (
 	"fmt"
 	"golang.org/x/net/context"
+	"testing"
 )
 
 type Nominator struct {
+	Name         string
 	Nominations  chan *Nomination
 	LeaderEvents chan *LeaderEvent
-}
-
-func NewNominator() *Nominator {
-	return &Nominator{
-		Nominations:  make(chan *Nomination, 1),
-		LeaderEvents: make(chan *LeaderEvent, 1),
-	}
+	t            *testing.T
 }
 
 func (n *Nominator) Nominate(ctx context.Context, name string, size int, leaders map[string]string) (string, error) {
+	n.t.Logf("%s nominate name=%s size=%d leaders=%+v", n.Name, name, size, leaders)
 	nom := &Nomination{
 		Name:    name,
 		Size:    size,
 		Leaders: leaders,
 		Result:  make(chan interface{}),
 	}
-
-	select {
-	case n.Nominations <- nom:
-	case <-ctx.Done():
-		return "", context.Canceled
-	}
+	n.Nominations <- nom
 
 	select {
 	case result := <-nom.Result:
@@ -47,14 +39,10 @@ func (n *Nominator) Nominate(ctx context.Context, name string, size int, leaders
 }
 
 func (n *Nominator) LeaderEvent(ctx context.Context, size int, leaders map[string]string) error {
-	event := &LeaderEvent{
+	n.t.Logf("%s event size=%d leaders=%+v", n.Name, size, leaders)
+	n.LeaderEvents <- &LeaderEvent{
 		Size:    size,
 		Leaders: leaders,
-	}
-	select {
-	case n.LeaderEvents <- event:
-	case <-ctx.Done():
-		return context.Canceled
 	}
 	return nil
 }
@@ -62,9 +50,11 @@ func (n *Nominator) LeaderEvent(ctx context.Context, size int, leaders map[strin
 func (n *Nominator) Close() error {
 	if n.Nominations != nil {
 		close(n.Nominations)
+		n.t.Logf("%s closed nominations", n.Name)
 	}
 	if n.LeaderEvents != nil {
 		close(n.LeaderEvents)
+		n.t.Logf("%s closed events", n.Name)
 	}
 	return nil
 }
