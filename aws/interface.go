@@ -3,6 +3,7 @@ package aws
 import (
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"golang.org/x/net/context"
 	"time"
@@ -17,12 +18,12 @@ type Interface struct {
 }
 
 // NewInterface creates a new Interface nominator.
-func NewInterface(instanceID string, interfaceIDs []string) (*Interface, error) {
+func NewInterface(region, instanceID string, interfaceIDs []string) (*Interface, error) {
 	if len(interfaceIDs) == 0 {
 		return nil, errors.New("no interface IDs provided")
 	}
 	return &Interface{
-		ec2:          ec2.New(nil),
+		ec2:          ec2.New(&aws.Config{Region: aws.String(region)}),
 		instanceID:   instanceID,
 		interfaceIDs: interfaceIDs,
 	}, nil

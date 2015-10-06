@@ -3,6 +3,7 @@ package aws
 import (
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"golang.org/x/net/context"
 )
@@ -17,7 +18,7 @@ type PrivateIP struct {
 }
 
 // NewPrivateIP creates a new PrivateIP nominator.
-func NewPrivateIP(instanceID string, privateIPs []string) (*PrivateIP, error) {
+func NewPrivateIP(region, instanceID string, privateIPs []string) (*PrivateIP, error) {
 	if len(privateIPs) == 0 {
 		return nil, errors.New("no private IPs provided")
 	}
@@ -26,7 +27,7 @@ func NewPrivateIP(instanceID string, privateIPs []string) (*PrivateIP, error) {
 		return nil, err
 	}
 	return &PrivateIP{
-		ec2:         ec2.New(nil),
+		ec2:         ec2.New(&aws.Config{Region: aws.String(region)}),
 		instanceID:  instanceID,
 		interfaceID: interfaceID,
 		privateIPs:  privateIPs,

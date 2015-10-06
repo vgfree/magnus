@@ -42,11 +42,15 @@ func main() {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, os.Interrupt)
 
+	region, err := aws.EC2Region()
+	if err != nil {
+		logger.Fatalf("unable to get region: %s", err)
+	}
 	instanceID, err := aws.EC2InstanceID()
 	if err != nil {
 		logger.Fatalf("unable to get instance ID: %s", err)
 	}
-	nominator, err := aws.NewInterface(instanceID, []string(interfaceIDs))
+	nominator, err := aws.NewInterface(region, instanceID, []string(interfaceIDs))
 	if err != nil {
 		logger.Fatal(err)
 	}

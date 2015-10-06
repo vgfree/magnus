@@ -24,6 +24,17 @@ func init() {
 	httpClient = &http.Client{Transport: transport}
 }
 
+func EC2Region() (string, error) {
+	zone, err := EC2Metadata("placement/availability-zone")
+	if err != nil {
+		return "", err
+	}
+	if len(zone) == 0 {
+		return "", fmt.Errorf("no availability zone returned")
+	}
+	return zone[:len(zone)-1], nil
+}
+
 // EC2InstanceID returns the instance ID of the instance running this program.
 func EC2InstanceID() (string, error) {
 	return EC2Metadata("instance-id")
