@@ -32,7 +32,7 @@ func (b *election) watch(events chan<- string) {
 				debug.Printf("watcher discarding event %s}", res.Node.Key)
 			}
 		} else {
-			logger.Printf("watch error on %s: %s", res.Node.Key, err)
+			logger.Printf("watch error on %s: %s", b.key, err)
 		}
 	}
 	close(events)
