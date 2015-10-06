@@ -1,0 +1,23 @@
+machine:
+  services:
+  - docker
+
+dependencies:
+  override:
+  - echo "{\"https://index.docker.io/v1/\":{\"auth\":\"$DOCKER_HASH\",\"email\":\"$DOCKER_EMAIL\"}}" > ~/.dockercfg
+  - chmod 600 ~/.dockercfg
+
+test:
+  pre:
+  - git clone --depth=1 git@github.com:WiFast/public-keys.git ~/public-keys
+  - ~/public-keys/scripts/gpg-import-all
+  override:
+  - make test
+  - make container
+
+deployment:
+  dockerhub:
+    branch: /.*/
+    commands:
+    - git fetch --tags
+    - make push
