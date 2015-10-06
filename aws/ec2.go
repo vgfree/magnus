@@ -60,7 +60,7 @@ func EC2Metadata(path string) (string, error) {
 		return "", err
 	} else if res.StatusCode < 200 || res.StatusCode > 299 {
 		return "", fmt.Errorf("invalid status code %d", res.StatusCode)
-	} else if data, err := ioutil.ReadAll(res.Body); err == nil {
+	} else if data, err := ioutil.ReadAll(res.Body); err != nil {
 		return "", err
 	} else {
 		return string(data), nil
