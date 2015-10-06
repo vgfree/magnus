@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	DefaultElectionTimeout    = 5 * time.Second
+	DefaultElectionTimeout    = 15 * time.Second
 	DefaultHeartbeatFrequency = 30 * time.Second
 	DefaultHeartbeatTimeout   = 5 * time.Second
 )
