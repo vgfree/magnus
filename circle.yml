@@ -17,8 +17,11 @@ test:
   - make container
 
 deployment:
-  dockerhub:
+  dockerhub-branch:
     branch: /.*/
     commands:
-    - git fetch --tags
-    - make push
+    - make push-branch
+  dockerhub-tag:
+    tag: /.*/
+    commands:
+    - make push-tag
