@@ -105,7 +105,9 @@ func AssertNoms(t *testing.T, have []*Nomination, want []*Nomination) {
 	for n, w := range want {
 		h := have[n]
 		if h.Name != w.Name || h.Size != w.Size || !reflect.DeepEqual(h.Leaders, w.Leaders) {
-			t.Errorf("nomination %d incorrect: %+v != %+v", n, h, w)
+			t.Errorf("nomination %d incorrect\nhave: %+v\nwant: %+v", n, h, w)
+		} else {
+			t.Logf("nomination %d correct\nhave: %+v", n, h)
 		}
 	}
 }
@@ -118,7 +120,9 @@ func AssertEvents(t *testing.T, have []*LeaderEvent, want []*LeaderEvent) {
 	for n, w := range want {
 		h := have[n]
 		if !reflect.DeepEqual(h, w) {
-			t.Errorf("event %d incorrect: %+v != %+v", n, h, w)
+			t.Errorf("event %d incorrect\nhave: %+v\nwant: %+v", n, h, w)
+		} else {
+			t.Logf("event %d correct\nhave: %+v", n, h)
 		}
 	}
 }
@@ -175,7 +179,7 @@ func TestOneElection(t *testing.T) {
 	nominations, events = RunElection(t, ctx, name, value)
 
 	AssertNoms(t, nominations, []*Nomination{
-		{Name: name, Size: 1, Leaders: map[string]string{name: value}},
+		{Name: name, Size: 1, Leaders: map[string]string{}},
 	})
 
 	AssertEvents(t, events, []*LeaderEvent{
@@ -222,7 +226,7 @@ func TestSecondElection(t *testing.T) {
 
 	t.Log("checking election 1")
 	AssertNoms(t, noms1, []*Nomination{
-		{Name: name1, Size: 1, Leaders: map[string]string{name1: value1}},
+		{Name: name1, Size: 1, Leaders: map[string]string{}},
 	})
 
 	AssertEvents(t, events1, []*LeaderEvent{
@@ -232,7 +236,7 @@ func TestSecondElection(t *testing.T) {
 
 	t.Log("checking election 2")
 	AssertNoms(t, noms2, []*Nomination{
-		{Name: name2, Size: 1, Leaders: map[string]string{name2: value2}},
+		{Name: name2, Size: 1, Leaders: map[string]string{}},
 	})
 
 	AssertEvents(t, events2, []*LeaderEvent{
