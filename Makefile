@@ -1,4 +1,4 @@
-name=ballot
+name=magnus
 container_name=wifast/$(name)
 project_name=go-$(name)
 
@@ -37,7 +37,8 @@ test: $(project_path)
 	test -z "$(shell gofmt -s -l ./aws ./cmd/ballotd ./election ./heartbeat ./lock)"
 	go vet ./aws ./cmd/ballotd ./election ./heartbeat ./lock
 	go get -d -t ./aws ./cmd/ballotd ./election ./heartbeat ./lock
-	go test -v -race ./aws ./cmd/ballotd ./election ./heartbeat ./lock
+	#go test -v -race ./aws ./cmd/ballotd ./election ./heartbeat ./lock
+	go test -v -run=Second ./election
 
 container:
 	docker build -t $(container_name):latest .
