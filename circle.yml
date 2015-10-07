@@ -11,6 +11,7 @@ test:
   pre:
   - git clone --depth=1 git@github.com:WiFast/public-keys.git ~/public-keys
   - ~/public-keys/scripts/gpg-import-all
+  - docker run -d -p 2379:2379 wifast/etcd -name etcd -advertise-client-urls http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 -initial-advertise-peer-urls http://127.0.0.1:2380 -listen-peer-urls http://0.0.0.0:2380 -initial-cluster etcd=http://127.0.0.1:2380
   override:
   - make test
   - make container
