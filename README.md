@@ -7,11 +7,10 @@ How Does It Work?
 Magnus runs across a set of machines that wish to participate in leadership
 elections. State is stored in a single etcd directory. When a Magnus instance
 comes online it checks etcd to see if there is an available leadership slot. If
-so the Magnus instance will update assign itself an available EIP (Elastic
-Network Interface) from the configured pool and update the etcd state
-directory.
+so the Magnus instance will assign itself an available EIP (Elastic Network
+Interface) from the configured pool and update the etcd state directory.
 
-This is made possible bu using etcd as a locking mechanism. Only one Magnus
+This is made possible by using etcd as a locking mechanism. Only one Magnus
 instance is allowed to access the state directory at a time. Changes to the
 state directory cause all Magnus instances to wake up and acquire a lock on the
 directory. Leaders are thus elected on a first-come-first-serve basis.
